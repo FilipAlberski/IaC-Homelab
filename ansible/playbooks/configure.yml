@@ -1,6 +1,6 @@
 ---
-- name: Bazowa konfiguracja Rocky Linux
-  hosts: rocky
+- name: Bazowa konfiguracja – wszystkie węzły RHCE
+  hosts: rhce
   become: true
 
   vars:
@@ -10,10 +10,8 @@
       - htop
       - curl
       - wget
+      - bash-completion
       - qemu-guest-agent
-
-    packages_remove:
-      - telnet
 
     sysctl_settings:
       vm.swappiness: 10
@@ -24,11 +22,6 @@
       ansible.builtin.dnf:
         name: "{{ packages_install }}"
         state: present
-
-    - name: Usunięcie zbędnych pakietów
-      ansible.builtin.dnf:
-        name: "{{ packages_remove }}"
-        state: absent
 
     - name: Uruchomienie qemu-guest-agent
       ansible.builtin.systemd:
@@ -45,11 +38,6 @@
         reload: true
       loop: "{{ sysctl_settings | dict2items }}"
 
-    - name: Konfiguracja SELinux – permissive (opcjonalnie zmień na enforcing)
-      ansible.posix.selinux:
-        policy: targeted
-        state: permissive
-
     - name: Firewalld – uruchomienie
       ansible.builtin.systemd:
         name: firewalld
@@ -62,3 +50,39 @@
         permanent: true
         state: enabled
         immediate: true
+
+- name: Konfiguracja control node
+  hosts: control
+  become: true
+
+  tasks:
+    - name: Instalacja Ansible na control node
+      ansible.builtin.dnf:
+        name:
+          - ansible-core
+          - python3-pip
+        state: present
+
+    - name: Konfiguracja SSH – generuj klucz dla użytkownika ansible
+      ansible.builtin.user:
+        name: ansible
+        generate_ssh_key: true
+        ssh_key_type: ed25519
+        ssh_key_file: .ssh/id_ed25519
+
+- name: Konfiguracja managed nodes
+  hosts: nodes
+  become: true
+
+  tasks:
+    - name: Firewalld – zezwól na dodatkowe usługi (RHCE ćwiczenia)
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - http
+        - https
+        - nfs
+        - nfs3

@@ -7,13 +7,14 @@ resource "proxmox_virtual_environment_vm" "vms" {
   description = each.value.description
 
   clone {
-    vm_id = var.template_id
-    full  = true
+    vm_id   = var.template_id
+    full    = true
+    retries = 3
   }
 
   cpu {
     cores = coalesce(each.value.cores, var.vm_defaults.cores)
-    type  = "x86-64-v2-AES"
+    type  = "host"
   }
 
   memory {
@@ -32,6 +33,10 @@ resource "proxmox_virtual_environment_vm" "vms" {
   }
 
   initialization {
+    datastore_id = "local-lvm"
+    dns {
+      servers = ["8.8.8.8", "1.1.1.1"]
+    }
     ip_config {
       ipv4 {
         address = each.value.ip
