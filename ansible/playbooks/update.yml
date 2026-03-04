@@ -1,0 +1,21 @@
+---
+- name: Aktualizacja systemu Rocky Linux
+  hosts: rocky
+  become: true
+
+  tasks:
+    - name: Aktualizacja wszystkich pakietów
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    - name: Sprawdź czy wymagany restart
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Restart jeśli wymagany
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+      when: reboot_required.stat.exists

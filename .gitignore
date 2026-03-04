@@ -1,0 +1,15 @@
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+*.tfplan
+
+# Ansible
+ansible/*.retry
+ansible/inventory/hosts_local.ini
+
+# Secrets / env
+*.env
+.env*
+secrets/
