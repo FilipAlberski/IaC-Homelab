@@ -1,0 +1,4 @@
+# Skopiuj do vault.yml i zaszyfruj: ansible-vault encrypt vault.yml
+zabbix_db_password: "zmien_mnie"
+grafana_db_password: "zmien_mnie"
+grafana_admin_password: "zmien_mnie"

@@ -1,0 +1,51 @@
+---
+- name: Instalacja Docker CE
+  hosts: app:proxy:dns
+  become: true
+
+  tasks:
+    - name: Usuń stare wersje Docker
+      ansible.builtin.dnf:
+        name:
+          - docker
+          - docker-client
+          - docker-common
+          - docker-engine
+        state: absent
+
+    - name: Dodaj repozytorium Docker CE
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/rhel/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+        mode: "0644"
+
+    - name: Instalacja Docker CE
+      ansible.builtin.dnf:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+
+    - name: Uruchomienie i włączenie Docker
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Dodaj użytkownika ansible do grupy docker
+      ansible.builtin.user:
+        name: ansible
+        groups: docker
+        append: true
+
+    - name: Firewalld – zezwól HTTP i HTTPS
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - http
+        - https

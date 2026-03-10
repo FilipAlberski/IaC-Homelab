@@ -1,5 +1,6 @@
 # Terraform
 terraform/.terraform/
+terraform/.terraform.tfstate.lock.info
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 terraform/terraform.tfvars
@@ -8,6 +9,7 @@ terraform/terraform.tfvars
 # Ansible
 ansible/*.retry
 ansible/inventory/hosts_local.ini
+ansible/inventory/group_vars/all/vault.yml
 
 # Secrets / env
 *.env

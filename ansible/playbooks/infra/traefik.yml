@@ -1,0 +1,137 @@
+---
+- name: Wdrożenie Traefik reverse proxy
+  hosts: proxy
+  become: true
+
+  vars:
+    traefik_dir: /opt/traefik
+
+  tasks:
+    - name: Utwórz katalogi Traefik
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ traefik_dir }}"
+        - "{{ traefik_dir }}/dynamic"
+
+    - name: Utwórz sieć Docker dla Traefik
+      community.docker.docker_network:
+        name: traefik
+        state: present
+
+    - name: Wdróż docker-compose.yml dla Traefik
+      ansible.builtin.copy:
+        dest: "{{ traefik_dir }}/docker-compose.yml"
+        mode: "0644"
+        content: |
+          services:
+            traefik:
+              image: traefik:v3.2
+              container_name: traefik
+              restart: unless-stopped
+              ports:
+                - "80:80"
+                - "443:443"
+                - "8080:8080"
+              volumes:
+                - /var/run/docker.sock:/var/run/docker.sock:ro
+                - ./traefik.yml:/traefik.yml:ro
+                - ./dynamic:/dynamic:ro
+                - ./acme.json:/acme.json
+              networks:
+                - traefik
+
+          networks:
+            traefik:
+              external: true
+
+    - name: Wdróż konfigurację Traefik
+      ansible.builtin.copy:
+        dest: "{{ traefik_dir }}/traefik.yml"
+        mode: "0644"
+        content: |
+          api:
+            dashboard: true
+            insecure: true
+
+          entryPoints:
+            web:
+              address: ":80"
+            websecure:
+              address: ":443"
+
+          providers:
+            docker:
+              exposedByDefault: false
+              network: traefik
+            file:
+              directory: /dynamic
+              watch: true
+
+          log:
+            level: INFO
+
+    - name: Wdróż dynamiczną konfigurację routingu
+      ansible.builtin.copy:
+        dest: "{{ traefik_dir }}/dynamic/services.yml"
+        mode: "0644"
+        content: |
+          http:
+            routers:
+              grafana:
+                rule: "Host(`grafana.homelab.local`)"
+                entryPoints:
+                  - web
+                service: grafana
+
+              zabbix:
+                rule: "Host(`zabbix.homelab.local`)"
+                entryPoints:
+                  - web
+                service: zabbix
+
+              prometheus:
+                rule: "Host(`prometheus.homelab.local`)"
+                entryPoints:
+                  - web
+                service: prometheus
+
+              adguard:
+                rule: "Host(`adguard.homelab.local`)"
+                entryPoints:
+                  - web
+                service: adguard
+
+            services:
+              grafana:
+                loadBalancer:
+                  servers:
+                    - url: "http://192.168.40.211:3000"
+
+              zabbix:
+                loadBalancer:
+                  servers:
+                    - url: "http://192.168.40.211:8080"
+
+              prometheus:
+                loadBalancer:
+                  servers:
+                    - url: "http://192.168.40.211:9090"
+
+              adguard:
+                loadBalancer:
+                  servers:
+                    - url: "http://192.168.40.213:80"
+
+    - name: Utwórz pusty acme.json z odpowiednimi uprawnieniami
+      ansible.builtin.file:
+        path: "{{ traefik_dir }}/acme.json"
+        state: touch
+        mode: "0600"
+
+    - name: Uruchom Traefik
+      community.docker.docker_compose_v2:
+        project_src: "{{ traefik_dir }}"
+        state: present

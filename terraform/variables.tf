@@ -51,6 +51,22 @@ variable "rhce" {
   default = {}
 }
 
+variable "infra" {
+  description = "Mapa serwerów infrastrukturalnych (proxy, app, db)"
+  type = map(object({
+    vm_id        = number
+    name         = string
+    description  = string
+    cores        = optional(number)
+    memory       = optional(number)
+    disk_gb      = optional(number)
+    datastore_id = optional(string, "local-lvm")
+    ip           = string
+    gateway      = string
+  }))
+  default = {}
+}
+
 variable "template_id" {
   description = "VM ID szablonu Rocky Linux w Proxmox"
   type        = number

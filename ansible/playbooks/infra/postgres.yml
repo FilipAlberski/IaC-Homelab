@@ -1,0 +1,106 @@
+---
+- name: Instalacja i konfiguracja PostgreSQL
+  hosts: db
+  become: true
+
+  vars:
+    postgres_version: 16
+    postgres_databases:
+      - name: zabbix
+        encoding: UTF8
+      - name: grafana
+        encoding: UTF8
+    postgres_users:
+      - name: zabbix
+        password: "{{ zabbix_db_password }}"
+        db: zabbix
+      - name: grafana
+        password: "{{ grafana_db_password }}"
+        db: grafana
+
+  tasks:
+    - name: Instalacja acl (wymagane do become_user)
+      ansible.builtin.dnf:
+        name: acl
+        state: present
+
+    - name: Dodaj repozytorium PGDG
+      ansible.builtin.dnf:
+        name: "https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+        state: present
+        disable_gpg_check: true
+
+    - name: Instalacja PostgreSQL {{ postgres_version }}
+      ansible.builtin.dnf:
+        name:
+          - "postgresql{{ postgres_version }}-server"
+          - "postgresql{{ postgres_version }}"
+          - python3-psycopg2
+        state: present
+
+    - name: Inicjalizacja klastra PostgreSQL
+      ansible.builtin.command:
+        cmd: "/usr/pgsql-{{ postgres_version }}/bin/postgresql-{{ postgres_version }}-setup initdb"
+        creates: "/var/lib/pgsql/{{ postgres_version }}/data/PG_VERSION"
+
+    - name: Uruchomienie i włączenie PostgreSQL
+      ansible.builtin.systemd:
+        name: "postgresql-{{ postgres_version }}"
+        enabled: true
+        state: started
+
+    - name: Utwórz bazy danych
+      community.postgresql.postgresql_db:
+        name: "{{ item.name }}"
+        encoding: "{{ item.encoding }}"
+        state: present
+      loop: "{{ postgres_databases }}"
+      become_user: postgres
+
+    - name: Utwórz użytkowników baz danych
+      community.postgresql.postgresql_user:
+        name: "{{ item.name }}"
+        password: "{{ item.password }}"
+        state: present
+      loop: "{{ postgres_users }}"
+      become_user: postgres
+
+    - name: Nadaj uprawnienia użytkownikom
+      community.postgresql.postgresql_privs:
+        db: "{{ item.db }}"
+        privs: ALL
+        type: database
+        obj: "{{ item.db }}"
+        role: "{{ item.name }}"
+      loop: "{{ postgres_users }}"
+      become_user: postgres
+
+    - name: Konfiguracja pg_hba – zezwól na połączenia z sieci lokalnej
+      community.postgresql.postgresql_pg_hba:
+        dest: "/var/lib/pgsql/{{ postgres_version }}/data/pg_hba.conf"
+        contype: host
+        databases: all
+        users: all
+        source: 192.168.40.0/24
+        method: scram-sha-256
+      notify: Restart PostgreSQL
+
+    - name: Konfiguracja postgresql.conf – nasłuchuj na wszystkich interfejsach
+      ansible.builtin.lineinfile:
+        path: "/var/lib/pgsql/{{ postgres_version }}/data/postgresql.conf"
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '*'"
+      notify: Restart PostgreSQL
+
+    - name: Firewalld – zezwól na PostgreSQL z sieci lokalnej
+      ansible.posix.firewalld:
+        rich_rule: "rule family=ipv4 source address=192.168.40.0/24 service name=postgresql accept"
+        permanent: true
+        state: enabled
+        immediate: true
+
+  handlers:
+    - name: Restart PostgreSQL
+      ansible.builtin.systemd:
+        name: "postgresql-{{ postgres_version }}"
+        state: restarted

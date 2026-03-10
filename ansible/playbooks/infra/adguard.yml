@@ -1,0 +1,54 @@
+---
+- name: Wdrożenie AdGuard Home
+  hosts: dns
+  become: true
+
+  vars:
+    adguard_dir: /opt/adguard
+
+  tasks:
+    - name: Utwórz katalogi AdGuard
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ adguard_dir }}"
+        - "{{ adguard_dir }}/work"
+        - "{{ adguard_dir }}/conf"
+
+    - name: Wdróż docker-compose.yml dla AdGuard Home
+      ansible.builtin.copy:
+        dest: "{{ adguard_dir }}/docker-compose.yml"
+        mode: "0644"
+        content: |
+          services:
+            adguard:
+              image: adguard/adguardhome:latest
+              container_name: adguard
+              restart: unless-stopped
+              ports:
+                - "53:53/tcp"
+                - "53:53/udp"
+                - "3000:3000/tcp"
+                - "80:80/tcp"
+              volumes:
+                - ./work:/opt/adguardhome/work
+                - ./conf:/opt/adguardhome/conf
+
+    - name: Uruchom AdGuard Home
+      community.docker.docker_compose_v2:
+        project_src: "{{ adguard_dir }}"
+        state: present
+
+    - name: Firewalld – zezwól DNS (TCP/UDP 53)
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - 53/tcp
+        - 53/udp
+        - 3000/tcp
+        - 80/tcp
