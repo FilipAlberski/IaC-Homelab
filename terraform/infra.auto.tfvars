@@ -4,7 +4,7 @@ infra = {
     name         = "proxy-01"
     description  = "Traefik – reverse proxy"
     cores        = 2
-    memory       = 2048
+    memory       = 204cd ..
     disk_gb      = 20
     datastore_id = "local-lvm"
     ip           = "192.168.40.210/24"
@@ -41,6 +41,17 @@ infra = {
     disk_gb      = 20
     datastore_id = "local-lvm"
     ip           = "192.168.40.213/24"
+    gateway      = "192.168.40.1"
+  }
+  git-01 = {
+    vm_id        = 5005
+    name         = "git-01"
+    description  = "GitLab CE – Git & CI/CD"
+    cores        = 4
+    memory       = 16384
+    disk_gb      = 100
+    datastore_id = "local-lvm"
+    ip           = "192.168.40.214/24"
     gateway      = "192.168.40.1"
   }
 }

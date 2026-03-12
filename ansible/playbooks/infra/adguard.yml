@@ -52,3 +52,48 @@
         - 53/udp
         - 3000/tcp
         - 80/tcp
+
+- name: Konfiguracja DNS rewrites w AdGuard Home
+  hosts: localhost
+  gather_facts: false
+  become: false
+
+  vars:
+    adguard_url: "http://192.168.40.213"
+    dns_rewrites:
+      - { domain: "proxy-01.homelab.local",   answer: "192.168.40.210" }
+      - { domain: "app-01.homelab.local",      answer: "192.168.40.211" }
+      - { domain: "db-01.homelab.local",       answer: "192.168.40.212" }
+      - { domain: "dns-01.homelab.local",      answer: "192.168.40.213" }
+      - { domain: "grafana.homelab.local",     answer: "192.168.40.210" }
+      - { domain: "zabbix.homelab.local",      answer: "192.168.40.210" }
+      - { domain: "prometheus.homelab.local",  answer: "192.168.40.210" }
+      - { domain: "adguard.homelab.local",     answer: "192.168.40.210" }
+      - { domain: "traefik.homelab.local",        answer: "192.168.40.210" }
+      - { domain: "proxmox.homelab.local",        answer: "192.168.40.210" }
+      - { domain: "git-01.homelab.local",         answer: "192.168.40.214" }
+      - { domain: "gitlab.homelab.local",        answer: "192.168.40.210" }
+      - { domain: "homepage.homelab.local",      answer: "192.168.40.210" }
+      - { domain: "rhce-control.homelab.local",  answer: "192.168.40.200" }
+      - { domain: "rhce-node-01.homelab.local",  answer: "192.168.40.201" }
+      - { domain: "rhce-node-02.homelab.local",  answer: "192.168.40.202" }
+      - { domain: "rhce-node-03.homelab.local",  answer: "192.168.40.203" }
+      - { domain: "rhce-node-04.homelab.local",  answer: "192.168.40.204" }
+      - { domain: "rhce-node-05.homelab.local",  answer: "192.168.40.205" }
+
+  tasks:
+    - name: Dodaj DNS rewrite
+      ansible.builtin.uri:
+        url: "{{ adguard_url }}/control/rewrite/add"
+        method: POST
+        url_username: "{{ adguard_user }}"
+        url_password: "{{ adguard_password }}"
+        force_basic_auth: true
+        body_format: json
+        body:
+          domain: "{{ item.domain }}"
+          answer: "{{ item.answer }}"
+        status_code: [200, 400]  # 400 = już istnieje, ignorujemy
+      loop: "{{ dns_rewrites }}"
+      loop_control:
+        label: "{{ item.domain }}"

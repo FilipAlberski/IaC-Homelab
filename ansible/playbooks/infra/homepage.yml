@@ -1,0 +1,165 @@
+---
+- name: Wdrożenie Homepage dashboard
+  hosts: app
+  become: true
+
+  vars:
+    homepage_dir: /opt/homepage
+
+  tasks:
+    - name: Utwórz katalogi Homepage
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ homepage_dir }}"
+        - "{{ homepage_dir }}/config"
+
+    - name: Wdróż docker-compose.yml dla Homepage
+      ansible.builtin.copy:
+        dest: "{{ homepage_dir }}/docker-compose.yml"
+        mode: "0644"
+        content: |
+          services:
+            homepage:
+              image: ghcr.io/gethomepage/homepage:latest
+              container_name: homepage
+              restart: unless-stopped
+              ports:
+                - "3001:3000"
+              environment:
+                HOMEPAGE_ALLOWED_HOSTS: "homepage.homelab.local"
+              volumes:
+                - ./config:/app/config
+                - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    - name: Wdróż konfigurację services
+      ansible.builtin.copy:
+        dest: "{{ homepage_dir }}/config/services.yaml"
+        mode: "0644"
+        content: |
+          - Infrastruktura:
+              - Proxmox:
+                  href: http://proxmox.homelab.local
+                  description: Hypervisor
+                  icon: proxmox.png
+                  ping: http://192.168.40.10:8006
+              - Traefik:
+                  href: http://traefik.homelab.local
+                  description: Reverse proxy
+                  icon: traefik.png
+                  ping: http://192.168.40.210:8080
+              - AdGuard Home:
+                  href: http://adguard.homelab.local
+                  description: DNS / Ad blocking
+                  icon: adguard-home.png
+                  ping: http://192.168.40.213:80
+
+          - Monitoring:
+              - Grafana:
+                  href: http://grafana.homelab.local
+                  description: Dashboardy
+                  icon: grafana.png
+                  ping: http://192.168.40.211:3000
+                  docker:
+                    container: grafana
+                    server: my-docker
+              - Prometheus:
+                  href: http://prometheus.homelab.local
+                  description: Metryki
+                  icon: prometheus.png
+                  ping: http://192.168.40.211:9090
+                  docker:
+                    container: prometheus
+                    server: my-docker
+              - Zabbix:
+                  href: http://zabbix.homelab.local
+                  description: Monitoring
+                  icon: zabbix.png
+                  ping: http://192.168.40.211:8080
+                  docker:
+                    container: zabbix-web
+                    server: my-docker
+
+          - Developerskie:
+              - GitLab:
+                  href: http://gitlab.homelab.local
+                  description: Git & CI/CD
+                  icon: gitlab.png
+                  ping: http://192.168.40.214:80
+
+    - name: Wdróż konfigurację settings
+      ansible.builtin.copy:
+        dest: "{{ homepage_dir }}/config/settings.yaml"
+        mode: "0644"
+        content: |
+          title: Homelab
+          background: https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920
+          cardBlur: md
+          theme: dark
+          color: slate
+          headerStyle: clean
+          language: pl
+          layout:
+            Infrastruktura:
+              style: row
+              columns: 3
+            Monitoring:
+              style: row
+              columns: 3
+            Developerskie:
+              style: row
+              columns: 2
+
+    - name: Wdróż konfigurację widgets
+      ansible.builtin.copy:
+        dest: "{{ homepage_dir }}/config/widgets.yaml"
+        mode: "0644"
+        content: |
+          - greeting:
+              text_size: xl
+              text: "Homelab Dashboard"
+
+          - datetime:
+              text_size: l
+              format:
+                dateStyle: long
+                timeStyle: short
+                hourCycle: h23
+
+          - resources:
+              cpu: true
+              memory: true
+              disk: /
+              cacheInterval: 5
+
+          - search:
+              provider: google
+              target: _blank
+
+    - name: Wdróż konfigurację docker
+      ansible.builtin.copy:
+        dest: "{{ homepage_dir }}/config/docker.yaml"
+        mode: "0644"
+        content: |
+          my-docker:
+            socket: /var/run/docker.sock
+
+    - name: Wdróż pustą konfigurację bookmarks
+      ansible.builtin.copy:
+        dest: "{{ homepage_dir }}/config/bookmarks.yaml"
+        mode: "0644"
+        content: "---\n"
+
+    - name: Uruchom Homepage
+      community.docker.docker_compose_v2:
+        project_src: "{{ homepage_dir }}"
+        state: present
+
+    - name: Firewalld – port Homepage
+      ansible.posix.firewalld:
+        port: "3001/tcp"
+        permanent: true
+        state: enabled
+        immediate: true

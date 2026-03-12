@@ -1,0 +1,63 @@
+---
+- name: Wdrożenie GitLab CE
+  hosts: git
+  become: true
+
+  vars:
+    gitlab_dir: /opt/gitlab
+    gitlab_external_url: "http://gitlab.homelab.local"
+
+  tasks:
+    - name: Utwórz katalogi GitLab
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ gitlab_dir }}"
+        - "{{ gitlab_dir }}/config"
+        - "{{ gitlab_dir }}/logs"
+        - "{{ gitlab_dir }}/data"
+
+    - name: Wdróż docker-compose.yml dla GitLab
+      ansible.builtin.copy:
+        dest: "{{ gitlab_dir }}/docker-compose.yml"
+        mode: "0644"
+        content: |
+          services:
+            gitlab:
+              image: gitlab/gitlab-ce:latest
+              container_name: gitlab
+              restart: unless-stopped
+              hostname: gitlab.homelab.local
+              environment:
+                GITLAB_OMNIBUS_CONFIG: |
+                  external_url '{{ gitlab_external_url }}'
+                  gitlab_rails['time_zone'] = 'Europe/Warsaw'
+                  gitlab_rails['gitlab_shell_ssh_port'] = 2222
+                  nginx['listen_port'] = 80
+                  nginx['listen_https'] = false
+                  prometheus_monitoring['enable'] = false
+              ports:
+                - "80:80"
+                - "2222:22"
+              volumes:
+                - ./config:/etc/gitlab
+                - ./logs:/var/log/gitlab
+                - ./data:/var/opt/gitlab
+              shm_size: "256m"
+
+    - name: Uruchom GitLab (pierwsze uruchomienie może potrwać kilka minut)
+      community.docker.docker_compose_v2:
+        project_src: "{{ gitlab_dir }}"
+        state: present
+
+    - name: Firewalld – porty GitLab
+      ansible.posix.firewalld:
+        port: "{{ item }}/tcp"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - "80"
+        - "2222"

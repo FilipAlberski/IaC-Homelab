@@ -104,6 +104,30 @@
                   - web
                 service: adguard
 
+              proxmox:
+                rule: "Host(`proxmox.homelab.local`)"
+                entryPoints:
+                  - web
+                service: proxmox
+
+              homepage:
+                rule: "Host(`homepage.homelab.local`)"
+                entryPoints:
+                  - web
+                service: homepage
+
+              gitlab:
+                rule: "Host(`gitlab.homelab.local`)"
+                entryPoints:
+                  - web
+                service: gitlab
+
+              traefik:
+                rule: "Host(`traefik.homelab.local`)"
+                entryPoints:
+                  - web
+                service: api@internal
+
             services:
               grafana:
                 loadBalancer:
@@ -124,6 +148,26 @@
                 loadBalancer:
                   servers:
                     - url: "http://192.168.40.213:80"
+
+              proxmox:
+                loadBalancer:
+                  servers:
+                    - url: "https://192.168.40.10:8006"
+                  serversTransport: insecureTransport
+
+              homepage:
+                loadBalancer:
+                  servers:
+                    - url: "http://192.168.40.211:3001"
+
+              gitlab:
+                loadBalancer:
+                  servers:
+                    - url: "http://192.168.40.214:80"
+
+            serversTransports:
+              insecureTransport:
+                insecureSkipVerify: true
 
     - name: Utwórz pusty acme.json z odpowiednimi uprawnieniami
       ansible.builtin.file:

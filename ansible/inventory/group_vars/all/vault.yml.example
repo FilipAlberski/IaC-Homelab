@@ -2,3 +2,5 @@
 zabbix_db_password: "zmien_mnie"
 grafana_db_password: "zmien_mnie"
 grafana_admin_password: "zmien_mnie"
+adguard_user: "zmien_mnie"
+adguard_password: "zmien_mnie"

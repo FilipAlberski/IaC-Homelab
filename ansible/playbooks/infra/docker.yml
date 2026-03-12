@@ -1,6 +1,6 @@
 ---
 - name: Instalacja Docker CE
-  hosts: app:proxy:dns
+  hosts: app:proxy:dns:git
   become: true
 
   tasks:
